@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rakétaindítások</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+body{margin:0;font-family:Arial;background:#0b1020;color:#fff}
+header{padding:16px;background:#111827}
+.controls{padding:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input,button{padding:8px}
+#map{height:350px}
+#launches{padding:12px}
+.card{background:#182235;margin:10px 0;padding:12px;border-radius:8px}
+</style>
+</head>
+<body>
+<header><h2>🚀 Rakétaindítások</h2></header>
+<div class="controls">
+<label>Elmúlt napok: <input id="days" type="number" value="30"></label>
+<label>vagy Kezdő: <input id="fromDate" type="date"></label>
+<label>Vége: <input id="toDate" type="date"></label>
+<button onclick="loadLaunches()">Lekérés</button>
+</div>
+<div id="map"></div>
+<div id="launches"></div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+const map=L.map('map').setView([20,0],2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
+let markers=[];
+function clearMarkers(){markers.forEach(m=>map.removeLayer(m));markers=[];}
+async function loadLaunches(){
+ clearMarkers();
+ let url;
+ const f=fromDate.value,t=toDate.value;
+ if(f&&t){
+   url=`https://ll.thespacedevs.com/2.2.0/launch/?window_start__gte=${new Date(f).toISOString()}&window_start__lte=${new Date(t+'T23:59:59').toISOString()}&ordering=-window_start&limit=100`;
+ }else{
+   const d=+days.value||30;
+   let e=new Date(),s=new Date(); s.setDate(e.getDate()-d);
+   url=`https://ll.thespacedevs.com/2.2.0/launch/?window_start__gte=${s.toISOString()}&window_start__lte=${e.toISOString()}&ordering=-window_start&limit=100`;
+ }
+ launches.innerHTML="Betöltés...";
+ try{
+ const r=await fetch(url); const data=await r.json();
+ launches.innerHTML="";
+ data.results.forEach(l=>{
+   const m=l.mission||{};
+   launches.innerHTML+=`<div class="card"><h3>${l.rocket.configuration.full_name}</h3>
+   <b>Űrcég:</b> ${l.launch_service_provider.name}<br>
+   <b>Honnan:</b> ${l.pad.location.name}<br>
+   <b>Indítás:</b> ${new Date(l.window_start).toLocaleString("hu-HU")}<br>
+   <b>Küldetés:</b> ${m.name||"Nincs"}<br>
+   <b>Cél:</b> ${m.description||"Nem nyilvános"}<br>
+   <b>Állapot:</b> ${l.status?l.status.name:"Ismeretlen"}
+   </div>`;
+   if(l.pad.latitude&&l.pad.longitude){
+     const mk=L.marker([l.pad.latitude,l.pad.longitude]).addTo(map)
+      .bindPopup(`<b>${l.rocket.configuration.full_name}</b><br>${l.pad.location.name}`);
+     markers.push(mk);
+   }
+ });
+ }catch(e){launches.innerHTML="Hiba történt az API lekérése során.";}
+}
+loadLaunches();
+</script>
+</body></html>
